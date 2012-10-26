@@ -10,8 +10,10 @@ Soap.Client = new Class({
         */
         version: "SOAP_1_1",
         encoding: "UTF-8",
+        location: null,
         user: null,
-        pass: null
+        pass: null,
+        output: 'json'
     },
 
     initialize:function(wsdl, options) {
@@ -82,7 +84,7 @@ Soap.Client = new Class({
         });
         
         var Xhr = Browser.Request();
-        Xhr.open("POST", this.address, true);
+        Xhr.open("POST", this.options.location || this.address, true);
         Xhr.setRequestHeader("Content-Type", "text/xml;charset={encoding}".substitute({"encoding": this.options.encoding}));
         Xhr.setRequestHeader("SOAPAction", this.methods[method]);
         Xhr.onreadystatechange = function() {
@@ -98,11 +100,23 @@ Soap.Client = new Class({
                 Nodes = Doc.evaluate("//*[local-name()='{method}Response']".substitute({"method": method}), Doc, ns, 0, null);
                 Node = Nodes.iterateNext();
                 if(Node) {
-                    cbf.run(JSON.fromXML(Node.firstChild, ""), that);
+                  var output = null;
+                  switch(that.options.output) {
+                    case 'json':
+                      output = JSON.fromXML(Node.firstChild, "");
+                      break;
+                    case 'xml':
+                      var parserOutput = new DOMParser();
+                      output = parserOutput.parseFromString(Node.firstChild.textContent, "text/xml");
+                      break;
+                    default:
+                      output = Node.firstChild;
+                      break;
+                  }
+                  cbf.call(that, output);
                 } else {
                     throw new TypeError("Invalid SOAP Response");
                 }
-                
             } else if(this.readyState == 4 && this.status != 200) {
                 throw "Can't process your XMLHTTPRequest.";
             }
